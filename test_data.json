@@ -1,0 +1,22 @@
+[
+  {
+   "id": "test1",
+   "whs_path": "./whs-data/test_1.csv",
+   "result_path": "./results/result_1.csv",
+   "current_heart_data": {},
+   "rri_chunk": [],
+   "multi_states": [],
+   "code_states": [],
+   "last_code_saved": -1
+   },
+  {
+   "id": "test2",
+   "whs_path": "./whs-data/test_2.csv",
+   "result_path": "./results/result_2.csv",
+   "current_heart_data": {},
+   "rri_chunk": [],
+   "multi_states": [],
+   "code_states": [],
+   "last_code_saved": -1
+   }
+]

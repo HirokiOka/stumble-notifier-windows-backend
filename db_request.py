@@ -32,7 +32,7 @@ def get_codeparams_from_std_id(std_id):
 
 def post_all_data_from_id(std_id, saved_at, source_code, features, multi_pred, code_pred):
     payload = json.dumps({
-        "collection": "features_and_predictions",
+        "collection": "test_pred",
         "database": "test",
         "dataSource": "Cluster0",
         "document": {
