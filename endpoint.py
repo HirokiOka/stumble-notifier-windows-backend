@@ -2,7 +2,7 @@ import pickle
 from read_heart_data import get_latest_heart_rate_data, calc_pnn50
 
 
-stumble_seq_length = 60
+STUMBLE_SEQ_LENGTH = 60
 multi_model_bin_path = './models/multi_model.pickle'
 code_model_bin_path = './models/code_model.pickle'
 
@@ -13,11 +13,13 @@ with open(code_model_bin_path, 'rb') as f:
 
 
 """
- - get row data from csv and DB
+ - get heart rate data from csv(x)
+ - get code data from DB
  - caclulate features
-    - pNN50 (Done)
+    - pNN50(x)
     - elapsed seconds
- - post-processing
+ - post-processing(x)
+ - real-time processing
 """
 
 
@@ -32,7 +34,7 @@ def classify_stumble(feature_data, mode='multi'):
 
 
 def post_process_stumbles(state_queue, ratio=2/3):
-    if (len(state_queue) < stumble_seq_length):
+    if (len(state_queue) < STUMBLE_SEQ_LENGTH):
         return None
     result = 0
     threshold = int(len(state_queue) * ratio)
