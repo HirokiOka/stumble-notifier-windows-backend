@@ -17,7 +17,7 @@ with open(code_model_bin_path, 'rb') as f:
 
 """
  - get heart rate data from csv(x)
- - get code data from DB
+ - get code data from DB(x)
  - caclulate features
     - pNN50(x)
     - elapsed seconds
