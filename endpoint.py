@@ -1,6 +1,7 @@
-import datetime
+import json
+import datetime as dt
 import pickle
-from code_db import connect_db, get_users, get_code_params
+from code_db import connect_db, get_code_params, get_latest_code_params
 from read_heart_data import get_latest_heart_rate_data, calc_pnn50
 
 
@@ -14,22 +15,12 @@ with open(multi_model_bin_path, 'rb') as f:
 with open(code_model_bin_path, 'rb') as f:
     code_model = pickle.load(f)
 
-
-"""
- - get heart rate data from csv(x)
- - get code data from DB(x)
- - caclulate features
-    - pNN50(x)
-    - elapsed seconds
- - classify stumble or not(x)
- - post-processing(x)
- - real-time processing
-"""
+conn = connect_db()
 
 
-def calc_elapsed_seconds(heart_rate_data_date):
-    current_date = datetime.datetime.now().strftime(heart_rate_data_date, date_fmt)
-    last_executed_time = 'placeholder'
+def calc_elapsed_seconds(heart_rate_data_date, user_id):
+    current_date = dt.datetime.now().strftime(heart_rate_data_date, date_fmt)
+    last_executed_time = get_latest_code_params(conn, user_id)
     elapse_seconds = (current_date - last_executed_time).seconds
     return elapse_seconds
 
@@ -55,6 +46,35 @@ def post_process_stumbles(state_queue, ratio=2/3):
         result = 0
     return result
 
+
+"""
+ - get heart rate data from csv(x)
+ - get code data from DB(x)
+ - caclulate features
+    - pNN50(x)
+    - elapsed seconds
+ - classify stumble or not(x)
+ - post-processing(x)
+ - connect to MongoDB
+ - make config (file)
+ - real-time processing
+"""
+
+config_path = './test_data.json'
+
+
+def main():
+    """
+        Real-time processing
+    """
+    with open(config_path) as f:
+        f_read = f.read()
+        metadata = json.loads(f_read)
+    print(metadata[0]['whs_path'])
+
+
+if __name__ == '__main__':
+    main()
 
 """
 calc_elapsed_seconds()

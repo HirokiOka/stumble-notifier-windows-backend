@@ -37,6 +37,6 @@ def get_latest_heart_rate_data(file_path):
 
 
 # Test
-test_path = './whs-data/test_1.csv'
+# test_path = './whs-data/test_1.csv'
 # get_latest_heart_rate_data(test_path)
-print(get_latest_heart_rate_data(test_path))
+# print(get_latest_heart_rate_data(test_path))
