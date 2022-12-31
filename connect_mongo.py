@@ -10,6 +10,7 @@ host = os.getenv('DBHOST')
 
 
 def connect_db():
+    print('connecting to MongoDB...')
     client = pymongo.MongoClient(f'{driver}://{user}:{password}@{host}/?retryWrites=true&w=majority')
     return client
 

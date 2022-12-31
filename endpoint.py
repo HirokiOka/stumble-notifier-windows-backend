@@ -1,9 +1,13 @@
 import json
+import warnings
 import datetime as dt
 import pickle
+from gen_dummy_data import gen_dummy_features
 from connect_mongo import connect_db, get_collection, get_latest_codeparams
 from read_heart_data import get_latest_heart_rate_data
 
+
+warnings.filterwarnings("ignore", category=Warning)
 
 STUMBLE_SEQ_LENGTH = 60
 date_fmt = '%Y/%m/%d %H:%M:%S'
@@ -27,12 +31,14 @@ def calc_elapsed_seconds(heart_rate_data, code_data, user_id):
     return elapse_seconds
 
 
+# lfhf, pnn50, sloc, ted, elapse_seconds
 def make_feature_data(heart_rate_data, code_data, elapse_seconds):
     pnn50 = heart_rate_data[1]
     lf_hf = heart_rate_data[2]
     sloc = code_data[1]
     ted = code_data[2]
-    features = [[sloc, ted, elapse_seconds, lf_hf, pnn50]]
+    # features = [[sloc, ted, elapse_seconds, lf_hf, pnn50]]
+    features = [[lf_hf, pnn50, sloc, ted, elapse_seconds]]
     return features
 
 
@@ -87,8 +93,27 @@ def main():
             current_elapsed_seconds)
 
     # Detect Stumble
+    """
     multi_result = classify_stumble(current_features, 'multi')
     code_result = classify_stumble(current_features, 'code')
+    print(current_features)
+    print(multi_result, code_result)
+    """
+    classified_multi = [
+            [], [], [], [], [], [], [], [], []
+            ]
+    classified_code = [
+            [], [], [], [], [], [], [], [], []
+            ]
+    while True:
+        for i in range(len(classified_multi)):
+            d_features = gen_dummy_features()
+            multi_result = classify_stumble(d_features, 'multi')
+            code_result = classify_stumble(d_features, 'code')
+            classified_multi[i].append(multi_result)
+            classified_code[i].append(code_result)
+            print(f'{i}: len {len(classified_multi[i])}')
+
     # Post-processing
     # Send Data to DB
 
