@@ -1,8 +1,8 @@
 import json
 import datetime as dt
 import pickle
-from code_db import connect_db, get_code_params, get_latest_code_params
-from read_heart_data import get_latest_heart_rate_data, calc_pnn50
+from connect_mongo import connect_db, get_collection, get_latest_codeparams
+from read_heart_data import get_latest_heart_rate_data
 
 
 STUMBLE_SEQ_LENGTH = 60
@@ -15,24 +15,35 @@ with open(multi_model_bin_path, 'rb') as f:
 with open(code_model_bin_path, 'rb') as f:
     code_model = pickle.load(f)
 
-conn = connect_db()
+client = connect_db()
+collection = get_collection(client, 'codeparams')
 
 
-def calc_elapsed_seconds(heart_rate_data_date, user_id):
-    current_date = dt.datetime.now().strftime(heart_rate_data_date, date_fmt)
-    last_executed_time = get_latest_code_params(conn, user_id)
-    elapse_seconds = (current_date - last_executed_time).seconds
+def calc_elapsed_seconds(heart_rate_data, code_data, user_id):
+    str_heart_rate_data_date = f'{dt.date.today()} {heart_rate_data[0]}'.replace('-', '/')
+    heart_rate_data_date = dt.datetime.strptime(str_heart_rate_data_date, date_fmt)
+    last_executed_time = dt.datetime.strptime(code_data[0], date_fmt)
+    elapse_seconds = (heart_rate_data_date - last_executed_time).seconds
     return elapse_seconds
 
 
-# SLOC, AST ED, elapsed-sec, lf/hf, pnn50
+def make_feature_data(heart_rate_data, code_data, elapse_seconds):
+    pnn50 = heart_rate_data[1]
+    lf_hf = heart_rate_data[2]
+    sloc = code_data[1]
+    ted = code_data[2]
+    features = [[sloc, ted, elapse_seconds, lf_hf, pnn50]]
+    return features
+
+
+# SLOC, ted, elapsed-sec, lf/hf, pnn50
 def classify_stumble(feature_data, mode='multi'):
     classified_result = []
     if (mode == 'code'):
-        classified_result = code_model.predict(feature_data)
+        classified_result = code_model.predict([feature_data[0][:3]])
     elif (mode == 'multi'):
         classified_result = multi_model.predict(feature_data)
-    return classified_result
+    return classified_result[0]
 
 
 def post_process_stumbles(state_queue, ratio=2/3):
@@ -47,19 +58,6 @@ def post_process_stumbles(state_queue, ratio=2/3):
     return result
 
 
-"""
- - get heart rate data from csv(x)
- - get code data from DB(x)
- - caclulate features
-    - pNN50(x)
-    - elapsed seconds
- - classify stumble or not(x)
- - post-processing(x)
- - connect to MongoDB
- - make config (file)
- - real-time processing
-"""
-
 config_path = './test_data.json'
 
 
@@ -67,19 +65,33 @@ def main():
     """
         Real-time processing
     """
+    # Setting
     with open(config_path) as f:
         f_read = f.read()
         metadata = json.loads(f_read)
-    print(metadata[0]['whs_path'])
+    whs_path = metadata[0]['whs_path']
+    user_id = 'nishida'
+
+    # Read current Data
+    current_heart_rate_data = get_latest_heart_rate_data(whs_path)
+    current_code_data = get_latest_codeparams(client, collection, user_id)
+
+    # Make Feature Data
+    current_elapsed_seconds = calc_elapsed_seconds(
+            current_heart_rate_data,
+            current_code_data,
+            user_id)
+    current_features = make_feature_data(
+            current_heart_rate_data,
+            current_code_data,
+            current_elapsed_seconds)
+
+    # Detect Stumble
+    multi_result = classify_stumble(current_features, 'multi')
+    code_result = classify_stumble(current_features, 'code')
+    # Post-processing
+    # Send Data to DB
 
 
 if __name__ == '__main__':
     main()
-
-"""
-calc_elapsed_seconds()
-sample_code_features = [[24, 2, 200], [24, 2, 200]]
-sample_multi_features = [[7.4, 10.0, 24, 2, 200], [2.0, 12.0, 24, 2, 200]]
-print(classify_stumble(sample_code_features, mode='code'))
-print(classify_stumble(sample_multi_features, mode='multi'))
-"""

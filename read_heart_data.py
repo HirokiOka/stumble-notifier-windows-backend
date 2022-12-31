@@ -23,20 +23,26 @@ def calc_pnn50(rri_chunk):
 
 # return a list of [time, RRI, lf/hf]
 def get_latest_heart_rate_data(file_path):
-    result = []
     with open(file_path, encoding="cp932", mode="r") as f:
         data = list(csv.reader(f))[6:]
         number_of_data = 0
         if (len(data) > PNN50_WINDOW_SIZE):
-            number_of_data = 100
+            heart_rate_data = data[:PNN50_WINDOW_SIZE]
+            rri_chunk = [d[1] for d in heart_rate_data]
+            time = heart_rate_data[-1][0]
+            lf_hf = float(heart_rate_data[-1][7])
+            pnn50 = calc_pnn50(rri_chunk)
+            return [time, pnn50, lf_hf]
         else:
             number_of_data = len(data)
-        heart_rate_data = data[:number_of_data]
-        result = [[d[0], d[1], d[7]] for d in heart_rate_data]
-    return result
+            heart_rate_data = data[:number_of_data]
+            time = heart_rate_data[-1][0]
+            lf_hf = float(heart_rate_data[-1][7])
+            pnn50 = 0.0
+            return [time, pnn50, lf_hf]
 
 
-# Test
-# test_path = './whs-data/test_1.csv'
-# get_latest_heart_rate_data(test_path)
-# print(get_latest_heart_rate_data(test_path))
+def test():
+    test_path = './whs-data/test_1.csv'
+    c_data = get_latest_heart_rate_data(test_path)
+    print(c_data)
