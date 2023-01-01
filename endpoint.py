@@ -3,7 +3,7 @@ import warnings
 import datetime as dt
 import pickle
 from gen_dummy_data import gen_dummy_features
-from connect_mongo import connect_db, get_collection, get_latest_codeparams
+from connect_mongo import connect_db, get_collection, get_latest_codeparams, insert_processed
 from read_heart_data import get_latest_heart_rate_data
 
 
@@ -13,6 +13,7 @@ STUMBLE_SEQ_LENGTH = 60
 date_fmt = '%Y/%m/%d %H:%M:%S'
 multi_model_bin_path = './models/multi_model.pickle'
 code_model_bin_path = './models/code_model.pickle'
+config_path = './test_data.json'
 
 with open(multi_model_bin_path, 'rb') as f:
     multi_model = pickle.load(f)
@@ -20,7 +21,7 @@ with open(code_model_bin_path, 'rb') as f:
     code_model = pickle.load(f)
 
 client = connect_db()
-collection = get_collection(client, 'codeparams')
+collection = get_collection(client, 'processed')
 
 
 def calc_elapsed_seconds(heart_rate_data, code_data, user_id):
@@ -61,10 +62,8 @@ def post_process_stumbles(state_queue, ratio=2/3):
         result = 1
     else:
         result = 0
+    state_queue.pop(0)
     return result
-
-
-config_path = './test_data.json'
 
 
 def main():
@@ -79,10 +78,12 @@ def main():
     user_id = 'nishida'
 
     # Read current Data
+    """
     current_heart_rate_data = get_latest_heart_rate_data(whs_path)
     current_code_data = get_latest_codeparams(client, collection, user_id)
-
+    """
     # Make Feature Data
+    """
     current_elapsed_seconds = calc_elapsed_seconds(
             current_heart_rate_data,
             current_code_data,
@@ -91,20 +92,12 @@ def main():
             current_heart_rate_data,
             current_code_data,
             current_elapsed_seconds)
+    """
 
     # Detect Stumble
-    """
-    multi_result = classify_stumble(current_features, 'multi')
-    code_result = classify_stumble(current_features, 'code')
-    print(current_features)
-    print(multi_result, code_result)
-    """
-    classified_multi = [
-            [], [], [], [], [], [], [], [], []
-            ]
-    classified_code = [
-            [], [], [], [], [], [], [], [], []
-            ]
+    classified_multi = [[], [], [], [], [], [], [], [], []]
+    classified_code = [[], [], [], [], [], [], [], [], []]
+
     while True:
         for i in range(len(classified_multi)):
             d_features = gen_dummy_features()
@@ -112,10 +105,14 @@ def main():
             code_result = classify_stumble(d_features, 'code')
             classified_multi[i].append(multi_result)
             classified_code[i].append(code_result)
-            print(f'{i}: len {len(classified_multi[i])}')
 
-    # Post-processing
-    # Send Data to DB
+            # Post-processing
+            pp_multi = post_process_stumbles(classified_multi[i])
+            pp_code = post_process_stumbles(classified_code[i])
+            # Send Data to DB
+            if (pp_multi is not (None) and pp_code is not (None)):
+                post_data = [pp_multi, pp_code]
+                insert_processed(client, collection, post_data)
 
 
 if __name__ == '__main__':

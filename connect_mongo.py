@@ -16,7 +16,7 @@ def connect_db():
 
 
 def get_collection(client, collection_name):
-    db = client.test
+    db = client.development
     collection = db[collection_name]
     return collection
 
@@ -32,6 +32,11 @@ def get_latest_codeparams(client, collection, user_id):
     sloc = doc['sloc']
     ted = doc['ted']
     return [executed_at, sloc, ted]
+
+
+def insert_processed(client, collection, data_list):
+    post = {'multi': data_list[0], 'code': data_list[1]}
+    return collection.insert_one(post)
 
 
 def test():
