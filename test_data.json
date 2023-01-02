@@ -1,47 +1,47 @@
 [
   {
    "id": "test1",
-   "whs_path": "./test-out/test_1.csv",
+   "whs_path": "./whs-data/test_1.csv",
    "result_path": "./results/result_1.csv"
    },
   {
    "id": "test2",
-   "whs_path": "./test-out/test_2.csv",
+   "whs_path": "./whs-data/test_2.csv",
    "result_path": "./results/result_2.csv"
    },
   {
    "id": "test3",
-   "whs_path": "./test-out/test_3.csv",
+   "whs_path": "./whs-data/test_3.csv",
    "result_path": "./results/result_3.csv"
    },
   {
    "id": "test4",
-   "whs_path": "./test-out/test_4.csv",
+   "whs_path": "./whs-data/test_4.csv",
    "result_path": "./results/result_4.csv"
    },
   {
    "id": "test5",
-   "whs_path": "./test-out/test_5.csv",
+   "whs_path": "./whs-data/test_5.csv",
    "result_path": "./results/result_5.csv"
    },
   {
    "id": "test6",
-   "whs_path": "./test-out/test_6.csv",
+   "whs_path": "./whs-data/test_6.csv",
    "result_path": "./results/result_6.csv"
    },
   {
    "id": "test7",
-   "whs_path": "./test-out/test_7.csv",
+   "whs_path": "./whs-data/test_7.csv",
    "result_path": "./results/result_7.csv"
    },
   {
    "id": "test8",
-   "whs_path": "./test-out/test_8.csv",
+   "whs_path": "./whs-data/test_8.csv",
    "result_path": "./results/result_8.csv"
    },
   {
    "id": "test9",
-   "whs_path": "./test-out/test_9.csv",
+   "whs_path": "./whs-data/test_9.csv",
    "result_path": "./results/result_9.csv"
    }
 ]

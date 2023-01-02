@@ -64,28 +64,16 @@ def post_process_stumbles(state_queue, ratio=2/3):
 
 def main():
     # Setting
-    """
     client = connect_db()
-    collection = get_collection(client, 'processed')
-    """
+    p_coll = get_collection(client, 'processed')
+    code_coll = get_collection(client, 'codeparams')
+
     with open(config_path) as f:
         f_read = f.read()
         metadata = json.loads(f_read)
-    whs_path = metadata[0]['whs_path']
 
     """
     # Read current Data
-    current_heart_rate_data = get_latest_heart_rate_data(whs_path)
-    current_code_data = get_latest_codeparams(client, collection, user_id)
-    # Make Feature Data
-    current_elapsed_seconds = calc_elapsed_seconds(
-            current_heart_rate_data,
-            current_code_data,
-            user_id)
-    current_features = make_feature_data(
-            current_heart_rate_data,
-            current_code_data,
-            current_elapsed_seconds)
     """
 
     # Detect Stumbles
@@ -93,13 +81,29 @@ def main():
     classified_code = [[], [], [], [], [], [], [], [], []]
 
     while True:
-        # Read Features
         for i, md in enumerate(metadata):
+            """
             append_dummy_row_to_csv(md['whs_path'])
             d_features = [read_latest_dummy_feature(md['whs_path'])]
+            """
+            # Get Features
+            whs_path = md['whs_path']
+            user_id = md['id']
+            current_heart_rate_data = get_latest_heart_rate_data(whs_path)
+            current_code_data = get_latest_codeparams(client,
+                                                      code_coll,
+                                                      user_id)
+            current_elapsed_seconds = calc_elapsed_seconds(
+                    current_heart_rate_data,
+                    current_code_data,
+                    user_id)
+            current_feature = make_feature_data(
+                    current_heart_rate_data,
+                    current_code_data,
+                    current_elapsed_seconds)
 
-            multi_result = classify_stumble(d_features, 'multi')
-            code_result = classify_stumble(d_features, 'code')
+            multi_result = classify_stumble(current_feature, 'multi')
+            code_result = classify_stumble(current_feature, 'code')
             classified_multi[i].append(multi_result)
             classified_code[i].append(code_result)
 
@@ -110,7 +114,7 @@ def main():
             # Send Data to DB
             if ((pp_multi is not None) and (pp_code is not None)):
                 post_data = [pp_multi, pp_code]
-                # insert_processed(client, collection, post_data)
+                # insert_processed(client, p_coll, post_data)
                 print(post_data)
 
 
