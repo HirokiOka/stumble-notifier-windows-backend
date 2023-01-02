@@ -3,8 +3,8 @@ import warnings
 import datetime as dt
 import pickle
 from gen_dummy_data import gen_dummy_features
-from connect_mongo import connect_db, get_collection, get_latest_codeparams, insert_processed
-from read_heart_data import get_latest_heart_rate_data
+from db import connect_db, get_collection, get_latest_codeparams, insert_processed
+from heart_rate import get_latest_heart_rate_data
 
 
 warnings.filterwarnings("ignore", category=Warning)
@@ -20,19 +20,15 @@ with open(multi_model_bin_path, 'rb') as f:
 with open(code_model_bin_path, 'rb') as f:
     code_model = pickle.load(f)
 
-client = connect_db()
-collection = get_collection(client, 'processed')
-
 
 def calc_elapsed_seconds(heart_rate_data, code_data, user_id):
-    str_heart_rate_data_date = f'{dt.date.today()} {heart_rate_data[0]}'.replace('-', '/')
-    heart_rate_data_date = dt.datetime.strptime(str_heart_rate_data_date, date_fmt)
+    s_heart_date = f'{dt.date.today()} {heart_rate_data[0]}'.replace('-', '/')
+    heart_rate_data_date = dt.datetime.strptime(s_heart_date, date_fmt)
     last_executed_time = dt.datetime.strptime(code_data[0], date_fmt)
     elapse_seconds = (heart_rate_data_date - last_executed_time).seconds
     return elapse_seconds
 
 
-# lfhf, pnn50, sloc, ted, elapse_seconds
 def make_feature_data(heart_rate_data, code_data, elapse_seconds):
     pnn50 = heart_rate_data[1]
     lf_hf = heart_rate_data[2]
@@ -43,7 +39,7 @@ def make_feature_data(heart_rate_data, code_data, elapse_seconds):
     return features
 
 
-# SLOC, ted, elapsed-sec, lf/hf, pnn50
+# SLOC, ted, elapsed-sec, lf/hf, pnn50?
 def classify_stumble(feature_data, mode='multi'):
     classified_result = []
     if (mode == 'code'):
@@ -67,10 +63,9 @@ def post_process_stumbles(state_queue, ratio=2/3):
 
 
 def main():
-    """
-        Real-time processing
-    """
     # Setting
+    client = connect_db()
+    collection = get_collection(client, 'processed')
     with open(config_path) as f:
         f_read = f.read()
         metadata = json.loads(f_read)
@@ -94,7 +89,7 @@ def main():
             current_elapsed_seconds)
     """
 
-    # Detect Stumble
+    # Detect Stumbles
     classified_multi = [[], [], [], [], [], [], [], [], []]
     classified_code = [[], [], [], [], [], [], [], [], []]
 
@@ -112,7 +107,8 @@ def main():
             # Send Data to DB
             if (pp_multi is not (None) and pp_code is not (None)):
                 post_data = [pp_multi, pp_code]
-                insert_processed(client, collection, post_data)
+                # insert_processed(client, collection, post_data)
+                print(post_data)
 
 
 if __name__ == '__main__':
