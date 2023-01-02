@@ -2,7 +2,7 @@ import json
 import warnings
 import datetime as dt
 import pickle
-from gen_dummy_data import gen_dummy_features
+from gen_dummy_data import gen_dummy_features, append_dummy_row_to_csv, read_latest_dummy_feature
 from db import connect_db, get_collection, get_latest_codeparams, insert_processed
 from heart_rate import get_latest_heart_rate_data
 
@@ -64,21 +64,20 @@ def post_process_stumbles(state_queue, ratio=2/3):
 
 def main():
     # Setting
+    """
     client = connect_db()
     collection = get_collection(client, 'processed')
+    """
     with open(config_path) as f:
         f_read = f.read()
         metadata = json.loads(f_read)
     whs_path = metadata[0]['whs_path']
-    user_id = 'nishida'
 
-    # Read current Data
     """
+    # Read current Data
     current_heart_rate_data = get_latest_heart_rate_data(whs_path)
     current_code_data = get_latest_codeparams(client, collection, user_id)
-    """
     # Make Feature Data
-    """
     current_elapsed_seconds = calc_elapsed_seconds(
             current_heart_rate_data,
             current_code_data,
@@ -94,8 +93,11 @@ def main():
     classified_code = [[], [], [], [], [], [], [], [], []]
 
     while True:
-        for i in range(len(classified_multi)):
-            d_features = gen_dummy_features()
+        # Read Features
+        for i, md in enumerate(metadata):
+            append_dummy_row_to_csv(md['whs_path'])
+            d_features = [read_latest_dummy_feature(md['whs_path'])]
+
             multi_result = classify_stumble(d_features, 'multi')
             code_result = classify_stumble(d_features, 'code')
             classified_multi[i].append(multi_result)
@@ -104,8 +106,9 @@ def main():
             # Post-processing
             pp_multi = post_process_stumbles(classified_multi[i])
             pp_code = post_process_stumbles(classified_code[i])
+
             # Send Data to DB
-            if (pp_multi is not (None) and pp_code is not (None)):
+            if ((pp_multi is not None) and (pp_code is not None)):
                 post_data = [pp_multi, pp_code]
                 # insert_processed(client, collection, post_data)
                 print(post_data)

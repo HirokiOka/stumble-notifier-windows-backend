@@ -25,6 +25,12 @@ def append_dummy_row_to_csv(csv_path):
         print(f'{dummy_data[0]} appended to {csv_path}')
 
 
+def read_latest_dummy_feature(csv_path):
+    with open(csv_path, 'r', encoding="cp932") as f:
+        latest_feature = list(csv.reader(f))[-1]
+        return latest_feature
+
+
 def test_dummy():
     while True:
         print(gen_dummy_features())
