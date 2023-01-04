@@ -21,14 +21,14 @@ def get_collection(client, collection_name):
     return collection
 
 
-def get_latest_document(client, collection, user_id):
-    documents = list(collection.find({"id": user_id}))
+def get_latest_document(client, collection, user_name):
+    documents = list(collection.find({"userName": user_name}))
     return documents[-1]
 
 
-def get_latest_codeparams(client, collection, user_id):
-    doc = get_latest_document(client, collection, user_id)
-    executed_at = doc['savedAt']
+def get_latest_codeparams(client, collection, user_name):
+    doc = get_latest_document(client, collection, user_name)
+    executed_at = doc['executedAt']
     sloc = doc['sloc']
     ted = doc['ted']
     return [executed_at, sloc, ted]
