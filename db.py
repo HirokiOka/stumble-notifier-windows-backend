@@ -34,8 +34,8 @@ def get_latest_codeparams(client, collection, user_name):
     return [executed_at, sloc, ted]
 
 
-def insert_processed(client, collection, data_list):
-    post = {'multi': data_list[0], 'code': data_list[1]}
+def insert_processed(client, collection, user_name, data_list):
+    post = {'userName': user_name, 'multi': data_list[0], 'code': data_list[1]}
     return collection.insert_one(post)
 
 

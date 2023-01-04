@@ -1,133 +1,133 @@
-import csv
 import json
-import datetime
+import warnings
+import datetime as dt
+import signal
 import time
 import pickle
-import pandas as pd
-from db_request import get_codeparams_from_std_id, post_all_data_from_id
-from read_csv import read_latest_data, calc_pnn50
+from gen_dummy_data import gen_dummy_features, append_dummy_row_to_csv, read_latest_dummy_feature
+from db import connect_db, get_collection, get_latest_codeparams, insert_processed
+from heart_rate import get_latest_heart_rate_data
 
-pnn50_window_size = 100
-stumble_seq_length = 60
+
+warnings.filterwarnings("ignore", category=Warning)
+
+STUMBLE_SEQ_LENGTH = 60
+date_fmt = '%Y/%m/%d %H:%M:%S'
 multi_model_bin_path = './models/multi_model.pickle'
 code_model_bin_path = './models/code_model.pickle'
+config_path = './test_data.json'
+
+with open(multi_model_bin_path, 'rb') as f:
+    multi_model = pickle.load(f)
+with open(code_model_bin_path, 'rb') as f:
+    code_model = pickle.load(f)
 
 
-def is_stumble(state_queue, ratio=0.4):
+def calc_elapsed_seconds(heart_rate_data, code_data, user_id):
+    s_heart_date = f'{dt.date.today()} {heart_rate_data[0]}'.replace('-', '/')
+    heart_rate_data_date = dt.datetime.strptime(s_heart_date, date_fmt)
+    last_executed_time = dt.datetime.strptime(code_data[0], date_fmt)
+    elapse_seconds = (heart_rate_data_date - last_executed_time).seconds
+    return elapse_seconds
+
+
+def make_feature_data(heart_rate_data, code_data, elapse_seconds):
+    pnn50 = heart_rate_data[1]
+    lf_hf = heart_rate_data[2]
+    sloc = code_data[1]
+    ted = code_data[2]
+    # features = [[sloc, ted, elapse_seconds, lf_hf, pnn50]]
+    features = [[lf_hf, pnn50, sloc, ted, elapse_seconds]]
+    return features
+
+
+# SLOC, ted, elapsed-sec, lf/hf, pnn50?
+def classify_stumble(feature_data, mode='multi'):
+    classified_result = []
+    if (mode == 'code'):
+        classified_result = code_model.predict([feature_data[0][:3]])
+    elif (mode == 'multi'):
+        classified_result = multi_model.predict(feature_data)
+    return classified_result[0]
+
+
+def post_process_stumbles(state_queue, ratio=2/3):
+    if (len(state_queue) < STUMBLE_SEQ_LENGTH):
+        return None
+    result = 0
     threshold = int(len(state_queue) * ratio)
     if (state_queue.count(0) > threshold):
-        return 0
-    return 1
-
-
-def str_date_to_datetime(date):
-    r_date = 0
-    if ('AM' in date or 'PM' in date):
-        date = date.split(' ')
-        date = date[0].split(',')[0] + ' ' + date[1]
-        r_date = datetime.datetime.strptime(date, '%m/%d/%Y %H:%M:%S')
+        result = 1
     else:
-        r_date = datetime.datetime.strptime(date, '%Y/%m/%d %H:%M:%S')
-    return r_date
+        result = 0
+    state_queue.pop(0)
+    return result
 
 
-def calc_elapsed_sec(current_time, last_saved_at):
-    c_date = str_date_to_datetime(current_time)
-    last_saved_date = str_date_to_datetime(last_saved_at)
-    elapsed_seconds = (c_date - last_saved_date).seconds
-    return elapsed_seconds
+def handler(signum, frame):
+    for i, md in enumerate(metadata):
+        """
+        append_dummy_row_to_csv(md['whs_path'])
+        d_features = [read_latest_dummy_feature(md['whs_path'])]
+        """
+        # Get Features
+        whs_path = md['whs_path']
+        user_name = md['name']
+        current_heart_rate_data = get_latest_heart_rate_data(whs_path)
+        current_code_data = get_latest_codeparams(client,
+                                                  code_coll,
+                                                  user_name)
+        current_elapsed_seconds = calc_elapsed_seconds(
+                current_heart_rate_data,
+                current_code_data,
+                user_name)
+        current_feature = make_feature_data(
+                current_heart_rate_data,
+                current_code_data,
+                current_elapsed_seconds)
 
+        multi_result = classify_stumble(current_feature, 'multi')
+        code_result = classify_stumble(current_feature, 'code')
+        classified_multi[i].append(multi_result)
+        classified_code[i].append(code_result)
 
-def update_heart_params(user_info):
-    latest_heart_data = read_latest_data(user_info["whs_path"])
-    user_info["current_heart_data"] = {
-            "time": latest_heart_data["time"],
-            "lf/hf": latest_heart_data["lf/hf"]}
-    user_info["rri_chunk"].append(latest_heart_data["rri"])
+        # Post-processing
+        pp_multi = post_process_stumbles(classified_multi[i])
+        pp_code = post_process_stumbles(classified_code[i])
+        dt_now = dt.datetime.now().time()
+        print(user_name, dt_now, pp_multi, pp_code)
 
-
-def make_feature_data(std_id, codeparams, elapsed_sec, rri_chunk, whs_params):
-    sloc = codeparams["sloc"]
-    ted = codeparams["ted"]
-    lf_hf = whs_params["lf/hf"]
-    pnn50 = calc_pnn50(rri_chunk)
-    feature_data = pd.DataFrame([[lf_hf, pnn50, sloc, ted, elapsed_sec]],
-                                columns=["lfhf", "pnn50",
-                                         "sloc", "ted", "elapsed-seconds"])
-    return feature_data
+        # Send Data to DB
+        if ((pp_multi is not None) and (pp_code is not None)):
+            post_data = [pp_multi, pp_code]
+            insert_processed(client, p_coll, user_name, post_data)
 
 
 def main():
-    sleep_sec = 1
-    start_time = datetime.datetime.now()
-    multi_model = ''
-    code_model = ''
-    with open('./participants.json') as f:
-        p_data = json.load(f)
 
-    with open(multi_model_bin_path, 'rb') as f:
-        multi_model = pickle.load(f)
-    with open(code_model_bin_path, 'rb') as f:
-        code_model = pickle.load(f)
+    global client
+    global p_coll
+    global code_coll
+    global classified_multi
+    global classified_code
+    global metadata
 
-    while(True):
-        for d in p_data:
-            update_heart_params(d)
+    client = connect_db()
+    p_coll = get_collection(client, 'processed')
+    code_coll = get_collection(client, 'codeparams')
 
-        # Prediction
-        for idx, info in enumerate(p_data):
-            if (len(info["rri_chunk"]) > pnn50_window_size):
-                std_id = info["id"]
+    with open(config_path) as f:
+        f_read = f.read()
+        metadata = json.loads(f_read)
 
-                # make codeparams
-                latest_codeparams = get_codeparams_from_std_id(std_id)[-1]
-                source_code = latest_codeparams["code"]
-                saved_at = latest_codeparams["savedAt"]
-                elapsed_sec = 0
-                if (info["last_code_saved"] == -1):
-                    elapsed_sec = (datetime.datetime.now() - start_time).seconds
-                else:
-                    # elapsed_sec = calc_elapsed_sec(datetime.datetime.now(), info["last_code_saved"])
-                    elapsed_sec = (datetime.datetime.now() - str_date_to_datetime(info["last_code_saved"])).seconds
+    classified_multi = [[], [], [], [], [], [], [], [], []]
+    classified_code = [[], [], [], [], [], [], [], [], []]
 
-                current_feature_data = make_feature_data(std_id,
-                                                         latest_codeparams,
-                                                         elapsed_sec,
-                                                         info["rri_chunk"],
-                                                         info["current_heart_data"])
-                multi_result = int(multi_model.predict(current_feature_data)[0])
-                code_result = int(code_model.predict(current_feature_data.loc[:,'sloc':'elapsed-seconds'])[0])
-                feature_dict = current_feature_data.to_dict()
-                with open(info["result_path"], 'a') as f:
-                    writer = csv.writer(f)
-                    writer.writerow([multi_result, code_result])
+    signal.signal(signal.SIGALRM, handler)
+    signal.setitimer(signal.ITIMER_REAL, 1.0, 1.0)
 
-                info["multi_states"].append(multi_result)
-                info["code_states"].append(code_result)
-                c_processed_multi = 0
-                c_processed_code = 0
-                if (len(info["multi_states"]) > stumble_seq_length - 1):
-                    c_processed_multi = is_stumble(info["multi_states"])
-                    info["multi_states"].pop(0)
-                if (len(info["code_states"]) > stumble_seq_length - 1):
-                    c_processed_code = is_stumble(info["code_states"])
-                    info["code_states"].pop(0)
-                print(f'std_id: {std_id}')
-                print(f'rm: {multi_result}, rc: {code_result},\
-                        pm: {c_processed_multi}, pc: {c_processed_code}')
-                # Post features and predictions to DB
-                try:
-                    print(post_all_data_from_id(std_id, saved_at,
-                          source_code,
-                          feature_dict, c_processed_multi, c_processed_code))
-                except:
-                    print("features and predictions data post failed")
-
-                info["last_code_saved"] = saved_at
-                info["rri_chunk"].pop(0)
-            else:
-                print(info["id"] + ": " + str(len(info["rri_chunk"])))
-        time.sleep(sleep_sec)
+    while True:
+        time.sleep(5)
 
 
 if __name__ == '__main__':
