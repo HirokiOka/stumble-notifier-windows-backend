@@ -36,16 +36,14 @@ def make_feature_data(heart_rate_data, code_data, elapse_seconds):
     lf_hf = heart_rate_data[2]
     sloc = code_data[1]
     ted = code_data[2]
-    # features = [[sloc, ted, elapse_seconds, lf_hf, pnn50]]
     features = [[lf_hf, pnn50, sloc, ted, elapse_seconds]]
     return features
 
 
-# SLOC, ted, elapsed-sec, lf/hf, pnn50?
 def classify_stumble(feature_data, mode='multi'):
     classified_result = []
     if (mode == 'code'):
-        classified_result = code_model.predict([feature_data[0][:3]])
+        classified_result = code_model.predict([feature_data[0][2:]])
     elif (mode == 'multi'):
         classified_result = multi_model.predict(feature_data)
     return classified_result[0]
