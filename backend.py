@@ -9,7 +9,7 @@ from db import connect_db, get_collection, get_latest_codeparams, insert_process
 from heart_rate import get_latest_heart_rate_data
 
 
-warnings.filterwarnings("ignore", category=Warning)
+# warnings.filterwarnings("ignore", category=Warning)
 
 STUMBLE_SEQ_LENGTH = 60
 date_fmt = '%Y/%m/%d %H:%M:%S'
