@@ -5,14 +5,17 @@ import datetime as dt
 import signal
 import time
 import pickle
-from gen_dummy_data import gen_dummy_features, append_dummy_row_to_csv, read_latest_dummy_feature
-from db import connect_db, get_collection, get_latest_codeparams, insert_processed
+from gen_dummy_data import gen_dummy_features,\
+                           append_dummy_row_to_csv, read_latest_dummy_feature
+from db import connect_db, get_collection,\
+               get_latest_codeparams, insert_processed
 from heart_rate import get_latest_heart_rate_data
 
 
 # warnings.filterwarnings("ignore", category=Warning)
 
 STUMBLE_SEQ_LENGTH = 60
+APPEDN_SEQ_LENGTH = 10
 date_fmt = '%Y/%m/%d %H:%M:%S'
 multi_model_bin_path = './models/multi_model.pickle'
 code_model_bin_path = './models/code_model.pickle'
@@ -25,10 +28,11 @@ with open(code_model_bin_path, 'rb') as f:
 
 
 def calc_elapsed_seconds(heart_rate_data, code_data, user_id):
-    s_heart_date = f'{dt.date.today()} {heart_rate_data[0]}'.replace('-', '/')
-    heart_rate_data_date = dt.datetime.strptime(s_heart_date, date_fmt)
+    # s_heart_date = f'{dt.date.today()} {heart_rate_data[0]}'.replace('-', '/')
+    # heart_rate_data_date = dt.datetime.strptime(s_heart_date, date_fmt)
+    c_datetime = dt.datetime.now()
     last_executed_time = dt.datetime.strptime(code_data[0], date_fmt)
-    elapse_seconds = (heart_rate_data_date - last_executed_time).seconds
+    elapse_seconds = (c_datetime - last_executed_time).seconds
     return elapse_seconds
 
 
@@ -106,7 +110,7 @@ def handler(signum, frame):
         classified_code[i].append(code_result)
 
         # Write features to a csv file
-        if (len(classified_multi[i]) > 9):
+        if (len(classified_multi[i]) >= APPEDN_SEQ_LENGTH):
             append_classified_to_csv(classified_multi[i],
                                      classified_code[i],
                                      classified_path)
@@ -114,6 +118,7 @@ def handler(signum, frame):
             classified_code[i].clear()
 
         # Post-processing
+        dt_now = dt.datetime.now().time()
         classified_data = read_classified_csv(classified_path)
         if (len(classified_data) >= STUMBLE_SEQ_LENGTH):
             n = len(classified_data)
@@ -122,13 +127,14 @@ def handler(signum, frame):
             current_code = [int(x[1]) for x in current_classified]
             pp_multi = post_process_stumbles(current_multi)
             pp_code = post_process_stumbles(current_code)
-            dt_now = dt.datetime.now().time()
-            print(user_name, dt_now, pp_multi, pp_code)
 
             # Send Data to DB
             if ((pp_multi is not None) and (pp_code is not None)):
                 post_data = [pp_multi, pp_code]
-                # insert_processed(client, p_coll, user_name, post_data)
+                print(user_name, dt_now, post_data)
+                insert_processed(client, p_coll, user_name, post_data)
+        else:
+            print(user_name, dt_now)
 
 
 def main():
