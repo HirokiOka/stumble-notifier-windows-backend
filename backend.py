@@ -1,4 +1,5 @@
 import json
+import csv
 import warnings
 import datetime as dt
 import signal
@@ -54,12 +55,26 @@ def post_process_stumbles(state_queue, ratio=2/3):
         return None
     result = 0
     threshold = int(len(state_queue) * ratio)
-    if (state_queue.count(0) > threshold):
+    if (state_queue.count(1) > threshold):
         result = 1
     else:
         result = 0
     state_queue.pop(0)
     return result
+
+
+def append_classified_to_csv(multi_list, code_list, csv_path):
+    with open(csv_path, 'a') as f:
+        writer = csv.writer(f, lineterminator='\n')
+        for i, _ in enumerate(multi_list):
+            concatted = [multi_list[i], code_list[i]]
+            writer.writerow(concatted)
+
+
+def read_classified_csv(csv_path):
+    with open(csv_path, 'r') as f:
+        reader = csv.reader(f)
+        return list(reader)
 
 
 def handler(signum, frame):
@@ -71,6 +86,7 @@ def handler(signum, frame):
         # Get Features
         whs_path = md['whs_path']
         user_name = md['name']
+        classified_path = md['classified_path']
         current_heart_rate_data = get_latest_heart_rate_data(whs_path)
         current_code_data = get_latest_codeparams(client,
                                                   code_coll,
@@ -89,16 +105,30 @@ def handler(signum, frame):
         classified_multi[i].append(multi_result)
         classified_code[i].append(code_result)
 
-        # Post-processing
-        pp_multi = post_process_stumbles(classified_multi[i])
-        pp_code = post_process_stumbles(classified_code[i])
-        dt_now = dt.datetime.now().time()
-        print(user_name, dt_now, pp_multi, pp_code)
+        # Write features to a csv file
+        if (len(classified_multi[i]) > 9):
+            append_classified_to_csv(classified_multi[i],
+                                     classified_code[i],
+                                     classified_path)
+            classified_multi[i].clear()
+            classified_code[i].clear()
 
-        # Send Data to DB
-        if ((pp_multi is not None) and (pp_code is not None)):
-            post_data = [pp_multi, pp_code]
-            insert_processed(client, p_coll, user_name, post_data)
+        # Post-processing
+        classified_data = read_classified_csv(classified_path)
+        if (len(classified_data) >= STUMBLE_SEQ_LENGTH):
+            n = len(classified_data)
+            current_classified = classified_data[n-STUMBLE_SEQ_LENGTH:n]
+            current_multi = [int(x[0]) for x in current_classified]
+            current_code = [int(x[1]) for x in current_classified]
+            pp_multi = post_process_stumbles(current_multi)
+            pp_code = post_process_stumbles(current_code)
+            dt_now = dt.datetime.now().time()
+            print(user_name, dt_now, pp_multi, pp_code)
+
+            # Send Data to DB
+            if ((pp_multi is not None) and (pp_code is not None)):
+                post_data = [pp_multi, pp_code]
+                # insert_processed(client, p_coll, user_name, post_data)
 
 
 def main():
