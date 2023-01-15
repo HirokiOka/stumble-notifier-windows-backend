@@ -1,7 +1,7 @@
 import json
 import csv
 import warnings
-import datetime as dt
+from datetime import datetime
 import signal
 import time
 import pickle
@@ -15,7 +15,7 @@ from heart_rate import get_latest_heart_rate_data
 # warnings.filterwarnings("ignore", category=Warning)
 
 STUMBLE_SEQ_LENGTH = 60
-APPEDN_SEQ_LENGTH = 10
+APPEND_SEQ_LENGTH = 10
 date_fmt = '%Y/%m/%d %H:%M:%S'
 multi_model_bin_path = './models/multi_model.pickle'
 code_model_bin_path = './models/code_model.pickle'
@@ -29,9 +29,9 @@ with open(code_model_bin_path, 'rb') as f:
 
 def calc_elapsed_seconds(heart_rate_data, code_data, user_id):
     # s_heart_date = f'{dt.date.today()} {heart_rate_data[0]}'.replace('-', '/')
-    # heart_rate_data_date = dt.datetime.strptime(s_heart_date, date_fmt)
-    c_datetime = dt.datetime.now()
-    last_executed_time = dt.datetime.strptime(code_data[0], date_fmt)
+    # heart_rate_data_date = datetime.strptime(s_heart_date, date_fmt)
+    c_datetime = datetime.now()
+    last_executed_time = datetime.strptime(code_data[0], date_fmt)
     elapse_seconds = (c_datetime - last_executed_time).seconds
     return elapse_seconds
 
@@ -67,12 +67,11 @@ def post_process_stumbles(state_queue, ratio=2/3):
     return result
 
 
-def append_classified_to_csv(multi_list, code_list, csv_path):
+def append_classified_to_csv(classified_data, csv_path):
     with open(csv_path, 'a') as f:
         writer = csv.writer(f, lineterminator='\n')
-        for i, _ in enumerate(multi_list):
-            concatted = [multi_list[i], code_list[i]]
-            writer.writerow(concatted)
+        for _, d in enumerate(classified_data):
+            writer.writerow(d)
 
 
 def read_classified_csv(csv_path):
@@ -81,87 +80,80 @@ def read_classified_csv(csv_path):
         return list(reader)
 
 
-def handler(signum, frame):
-    for i, md in enumerate(metadata):
-        """
-        append_dummy_row_to_csv(md['whs_path'])
-        d_features = [read_latest_dummy_feature(md['whs_path'])]
-        """
-        # Get Features
-        whs_path = md['whs_path']
-        user_name = md['name']
-        classified_path = md['classified_path']
-        current_heart_rate_data = get_latest_heart_rate_data(whs_path)
-        current_code_data = get_latest_codeparams(client,
-                                                  code_coll,
-                                                  user_name)
-        current_elapsed_seconds = calc_elapsed_seconds(
-                current_heart_rate_data,
-                current_code_data,
-                user_name)
-        current_feature = make_feature_data(
-                current_heart_rate_data,
-                current_code_data,
-                current_elapsed_seconds)
-
-        multi_result = classify_stumble(current_feature, 'multi')
-        code_result = classify_stumble(current_feature, 'code')
-        classified_multi[i].append(multi_result)
-        classified_code[i].append(code_result)
-
-        # Write features to a csv file
-        if (len(classified_multi[i]) >= APPEDN_SEQ_LENGTH):
-            append_classified_to_csv(classified_multi[i],
-                                     classified_code[i],
-                                     classified_path)
-            classified_multi[i].clear()
-            classified_code[i].clear()
-
-        # Post-processing
-        dt_now = dt.datetime.now().time()
-        classified_data = read_classified_csv(classified_path)
-        if (len(classified_data) >= STUMBLE_SEQ_LENGTH):
-            n = len(classified_data)
-            current_classified = classified_data[n-STUMBLE_SEQ_LENGTH:n]
-            current_multi = [int(x[0]) for x in current_classified]
-            current_code = [int(x[1]) for x in current_classified]
-            pp_multi = post_process_stumbles(current_multi)
-            pp_code = post_process_stumbles(current_code)
-
-            # Send Data to DB
-            if ((pp_multi is not None) and (pp_code is not None)):
-                post_data = [pp_multi, pp_code]
-                print(user_name, dt_now, post_data)
-                insert_processed(client, p_coll, user_name, post_data)
-        else:
-            print(user_name, dt_now)
-
-
 def main():
-
-    global client
-    global p_coll
-    global code_coll
-    global classified_multi
-    global classified_code
-    global metadata
 
     client = connect_db()
     p_coll = get_collection(client, 'processed')
     code_coll = get_collection(client, 'codeparams')
+    classified_results = [[], [], [], [], [], [], [], [], []]
 
     with open(config_path) as f:
         f_read = f.read()
         metadata = json.loads(f_read)
 
-    classified_multi = [[], [], [], [], [], [], [], [], []]
-    classified_code = [[], [], [], [], [], [], [], [], []]
-
-    signal.signal(signal.SIGALRM, handler)
-    signal.setitimer(signal.ITIMER_REAL, 1.0, 1.0)
-
     while True:
-        time.sleep(5)
+        for i, md in enumerate(metadata):
+            current_dt = datetime.now()
+            # current_dt = datetime.now().time().replace(microsecond=0)
+
+            # Get Features
+            whs_path = md['whs_path']
+            user_name = md['name']
+            classified_path = md['classified_path']
+            current_heart_rate_data = get_latest_heart_rate_data(whs_path)
+            current_code_data = get_latest_codeparams(client,
+                                                      code_coll,
+                                                      user_name)
+            current_elapsed_seconds = calc_elapsed_seconds(
+                    current_heart_rate_data,
+                    current_code_data,
+                    user_name)
+            current_feature = make_feature_data(
+                    current_heart_rate_data,
+                    current_code_data,
+                    current_elapsed_seconds)
+
+            multi_result = classify_stumble(current_feature, 'multi')
+            code_result = classify_stumble(current_feature, 'code')
+            classified_results[i].append((
+                current_dt.time().replace(microsecond=0),
+                multi_result,
+                code_result))
+
+            # Write classified data to a csv file
+            if (len(classified_results[i]) >= APPEND_SEQ_LENGTH):
+                """
+                    should append all at once?
+                """
+                append_classified_to_csv(classified_results[i],
+                                         classified_path)
+                classified_results[i].clear()
+
+            # Post-processing
+            classified_data = read_classified_csv(classified_path)
+            n = len(classified_data)
+            if (n >= STUMBLE_SEQ_LENGTH):
+                current_classified = classified_data[n-STUMBLE_SEQ_LENGTH:n]
+                current_multi = [int(x[0]) for x in current_classified]
+                current_code = [int(x[1]) for x in current_classified]
+                pp_multi = post_process_stumbles(current_multi)
+                pp_code = post_process_stumbles(current_code)
+
+                # Send Data to DB
+                if ((pp_multi is not None) and (pp_code is not None)):
+                    """
+                        - post all user data at once (regular interval, 10sec?)
+                        - stock classified_data of all users?
+                            - 10 * 9
+                                - to csv file
+                                    - append to classified-data?
+                    """
+                    post_data = [pp_multi, pp_code]
+                    print(f'{user_name}: {current_dt.time().replace(microsecond=0)} {post_data}')
+                    # insert_processed(client, p_coll, user_name, post_data)
+            else:
+                print(user_name, current_dt)
+        time.sleep(1.0)
 
 
 if __name__ == '__main__':
