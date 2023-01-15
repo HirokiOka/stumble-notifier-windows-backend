@@ -113,29 +113,25 @@ def main():
                     current_code_data,
                     current_elapsed_seconds)
 
+            """
+                make feature data
+                -> classify stumble
+                -> post-processing
+                -> write results to csv
+                -> send post-processed data to MongoDB
+            """
+            # Classify from features
             multi_result = classify_stumble(current_feature, 'multi')
             code_result = classify_stumble(current_feature, 'code')
-            classified_results[i].append((
-                current_dt.time().replace(microsecond=0),
-                multi_result,
-                code_result))
-
-            # Write classified data to a csv file
-            if (len(classified_results[i]) >= APPEND_SEQ_LENGTH):
-                """
-                    should append all at once?
-                """
-                append_classified_to_csv(classified_results[i],
-                                         classified_path)
-                classified_results[i].clear()
 
             # Post-processing
             classified_data = read_classified_csv(classified_path)
-            n = len(classified_data)
-            if (n >= STUMBLE_SEQ_LENGTH):
-                current_classified = classified_data[n-STUMBLE_SEQ_LENGTH:n]
-                current_multi = [int(x[0]) for x in current_classified]
-                current_code = [int(x[1]) for x in current_classified]
+            classified_len = len(classified_data)
+            post_data = []
+            if (classified_len >= STUMBLE_SEQ_LENGTH):
+                current_classified = classified_data[classified_len-STUMBLE_SEQ_LENGTH:classified_len]
+                current_multi = [int(x[1]) for x in current_classified]
+                current_code = [int(x[2]) for x in current_classified]
                 pp_multi = post_process_stumbles(current_multi)
                 pp_code = post_process_stumbles(current_code)
 
@@ -147,12 +143,25 @@ def main():
                             - 10 * 9
                                 - to csv file
                                     - append to classified-data?
+                                    - when classified
+                        - combine append classified data and send data?
                     """
                     post_data = [pp_multi, pp_code]
-                    print(f'{user_name}: {current_dt.time().replace(microsecond=0)} {post_data}')
                     # insert_processed(client, p_coll, user_name, post_data)
-            else:
-                print(user_name, current_dt)
+            print(f'{user_name}: {current_dt.time().replace(microsecond=0)} {post_data}')
+
+            classified_results[i].append((
+                current_dt.time().replace(microsecond=0),
+                multi_result,
+                code_result,
+                post_data
+                ))
+
+            # Write classified data to a csv file
+            if (len(classified_results[i]) >= APPEND_SEQ_LENGTH):
+                append_classified_to_csv(classified_results[i],
+                                         classified_path)
+                classified_results[i].clear()
         time.sleep(1.0)
 
 
