@@ -2,13 +2,12 @@ import json
 import csv
 import warnings
 from datetime import datetime
-import signal
 import time
 import pickle
 from gen_dummy_data import gen_dummy_features,\
                            append_dummy_row_to_csv, read_latest_dummy_feature
 from db import connect_db, get_collection,\
-               get_latest_codeparams, insert_processed
+               get_latest_codeparams, insert_many_processed
 from heart_rate import get_latest_heart_rate_data
 
 
@@ -85,11 +84,12 @@ def main():
     client = connect_db()
     p_coll = get_collection(client, 'processed')
     code_coll = get_collection(client, 'codeparams')
-    classified_results = [[], [], [], [], [], [], [], [], []]
 
     with open(config_path) as f:
         f_read = f.read()
         metadata = json.loads(f_read)
+
+    classified_results = [[] for i in range(len(metadata))]
 
     while True:
         for i, md in enumerate(metadata):
@@ -113,13 +113,6 @@ def main():
                     current_code_data,
                     current_elapsed_seconds)
 
-            """
-                make feature data
-                -> classify stumble
-                -> post-processing
-                -> write results to csv
-                -> send post-processed data to MongoDB
-            """
             # Classify from features
             multi_result = classify_stumble(current_feature, 'multi')
             code_result = classify_stumble(current_feature, 'code')
@@ -127,41 +120,36 @@ def main():
             # Post-processing
             classified_data = read_classified_csv(classified_path)
             classified_len = len(classified_data)
-            post_data = []
+            processed_data = []
             if (classified_len >= STUMBLE_SEQ_LENGTH):
                 current_classified = classified_data[classified_len-STUMBLE_SEQ_LENGTH:classified_len]
                 current_multi = [int(x[1]) for x in current_classified]
                 current_code = [int(x[2]) for x in current_classified]
+                # Post-process from 60 classified data
                 pp_multi = post_process_stumbles(current_multi)
                 pp_code = post_process_stumbles(current_code)
-
-                # Send Data to DB
-                if ((pp_multi is not None) and (pp_code is not None)):
-                    """
-                        - post all user data at once (regular interval, 10sec?)
-                        - stock classified_data of all users?
-                            - 10 * 9
-                                - to csv file
-                                    - append to classified-data?
-                                    - when classified
-                        - combine append classified data and send data?
-                    """
-                    post_data = [pp_multi, pp_code]
-                    # insert_processed(client, p_coll, user_name, post_data)
-            print(f'{user_name}: {current_dt.time().replace(microsecond=0)} {post_data}')
+                processed_data = [pp_multi, pp_code]
 
             classified_results[i].append((
                 current_dt.time().replace(microsecond=0),
                 multi_result,
                 code_result,
-                post_data
+                processed_data
                 ))
+            short_dt = current_dt.time().replace(microsecond=0)
+            print(f'{user_name}: {short_dt} {processed_data}')
 
             # Write classified data to a csv file
             if (len(classified_results[i]) >= APPEND_SEQ_LENGTH):
                 append_classified_to_csv(classified_results[i],
                                          classified_path)
+
+                processed = [x[3] for x in classified_results[i]]
+                if (not ([] in processed)):
+                    # insert_one_processed(client, p_coll, user_name, post_data)
+                    insert_many_processed(client, p_coll, user_name, processed)
                 classified_results[i].clear()
+
         time.sleep(1.0)
 
 
