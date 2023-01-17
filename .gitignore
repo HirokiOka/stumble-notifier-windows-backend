@@ -4,3 +4,4 @@ __pycache__/
 .env
 participants.json
 /test-out
+memo.txt
