@@ -12,12 +12,8 @@ from db import connect_db, get_collection,\
                get_latest_codeparams, insert_many_processed
 from heart_rate import get_latest_heart_rate_data
 
-<<<<<<< HEAD
 
 # warnings.filterwarnings("ignore", category=Warning)
-=======
-warnings.filterwarnings("ignore", category=Warning)
->>>>>>> dev
 
 SS_LEN = 60
 APPEND_LEN = 10
