@@ -1,3 +1,5 @@
+import cProfile
+import pstats
 import json
 import csv
 import warnings
@@ -13,7 +15,7 @@ from heart_rate import get_latest_heart_rate_data
 warnings.filterwarnings("ignore", category=Warning)
 
 SS_LEN = 60
-APPEND_LEN = 5
+APPEND_LEN = 10
 date_fmt = '%Y/%m/%d %H:%M:%S'
 multi_model_bin_path = './models/multi_model.pickle'
 code_model_bin_path = './models/code_model.pickle'
@@ -96,8 +98,8 @@ def main():
             # Get Features
             classified_path = m['classified_path']
             current_heart_rate_data = get_latest_heart_rate_data(m['whs_path'])
-            current_code_data = get_latest_codeparams(client,
-                                                      code_coll,
+            # Should be fixed
+            current_code_data = get_latest_codeparams(code_coll,
                                                       m['name'])
             current_elapsed_seconds = calc_elapsed_seconds(
                     current_heart_rate_data,
@@ -139,9 +141,8 @@ def main():
                                          classified_path)
                 processed = [x[3] for x in calc_results[i]]
                 if (not ([] in processed)):
-                    pass
                     # insert_one_processed(client, p_coll, m["name"], post_data)
-                    insert_many_processed(client, p_coll, m["name"], processed)
+                    insert_many_processed(p_coll, m["name"], processed)
                 calc_results[i].clear()
 
         time.sleep(1.0)
@@ -149,3 +150,8 @@ def main():
 
 if __name__ == '__main__':
     main()
+    """
+    cProfile.run('main()', 'restats')
+    p = pstats.Stats('restats')
+    p.strip_dirs().sort_stats('cumulative').print_stats()
+    """
