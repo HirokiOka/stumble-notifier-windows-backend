@@ -50,7 +50,8 @@ def insert_one_processed(collection, user_name, data_list):
 
 
 def insert_many_processed(collection, user_name, processed_data):
-    post = [{'userName': user_name, 'multi': v[0], 'code': v[1]} for v in processed_data]
+    post = [{'userName': user_name, 'processed_time': v[0], 'multi': v[1][0], 'code': v[1][1]} for v in processed_data]
+    print(post)
     if (post):
         return collection.insert_many(post)
     else:
