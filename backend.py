@@ -13,7 +13,7 @@ from db import connect_db, get_collection,\
 from heart_rate import get_latest_heart_rate_data
 
 
-# warnings.filterwarnings("ignore", category=Warning)
+warnings.filterwarnings("ignore", category=Warning)
 
 SS_LEN = 60
 APPEND_LEN = 10
@@ -129,7 +129,7 @@ def main():
                 processed_data = [pp_multi, pp_code]
 
             calc_results[i].append((
-                short_dt,
+                str(short_dt),
                 multi_result,
                 code_result,
                 processed_data
@@ -140,7 +140,7 @@ def main():
             if (len(calc_results[i]) >= APPEND_LEN):
                 append_classified_to_csv(calc_results[i],
                                          classified_path)
-                processed = [x[3] for x in calc_results[i]]
+                processed = [(x[0], x[3]) for x in calc_results[i]]
                 if (not ([] in processed)):
                     # insert_one_processed(client, p_coll, m["name"], post_data)
                     insert_many_processed(p_coll, m["name"], processed)
