@@ -26,18 +26,21 @@ def get_latest_heart_rate_data(file_path):
     with open(file_path, encoding="cp932", mode="r") as f:
         data = list(csv.reader(f))[6:]
         number_of_data = 0
+        lf_hf = 0.0
         if (len(data) > PNN50_WINDOW_SIZE):
             heart_rate_data = data[:PNN50_WINDOW_SIZE]
             rri_chunk = [d[1] for d in heart_rate_data]
             time = heart_rate_data[-1][0]
-            lf_hf = float(heart_rate_data[-1][7])
+            if (heart_rate_data[-1][7] != '-'):
+                lf_hf = float(heart_rate_data[-1][7])
             pnn50 = calc_pnn50(rri_chunk)
             return [time, pnn50, lf_hf]
         else:
             number_of_data = len(data)
             heart_rate_data = data[:number_of_data]
             time = heart_rate_data[-1][0]
-            lf_hf = float(heart_rate_data[-1][7])
+            if (heart_rate_data[-1][7] != '-'):
+                lf_hf = float(heart_rate_data[-1][7])
             pnn50 = 0.0
             return [time, pnn50, lf_hf]
 

@@ -38,10 +38,10 @@ def find_latest_doc(collection, user_name):
 
 def get_latest_codeparams(collection, user_name):
     doc = find_latest_doc(collection, user_name)
-    executed_at = doc['executedAt']
+    saved_at = doc['savedAt']
     sloc = doc['sloc']
     ted = doc['ted']
-    return [executed_at, sloc, ted]
+    return [saved_at, sloc, ted]
 
 
 def insert_one_processed(collection, user_name, data_list):

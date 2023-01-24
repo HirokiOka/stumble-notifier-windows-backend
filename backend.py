@@ -16,7 +16,7 @@ from heart_rate import get_latest_heart_rate_data
 warnings.filterwarnings("ignore", category=Warning)
 
 SS_LEN = 60
-APPEND_LEN = 10
+APPEND_LEN = 5
 date_fmt = '%Y/%m/%d %H:%M:%S'
 multi_model_bin_path = './models/multi_model.pickle'
 code_model_bin_path = './models/code_model.pickle'
@@ -100,8 +100,12 @@ def main():
             classified_path = m['classified_path']
             current_heart_rate_data = get_latest_heart_rate_data(m['whs_path'])
             # Should be fixed
-            current_code_data = get_latest_codeparams(code_coll,
-                                                      m['name'])
+            current_code_data = []
+            try:
+                current_code_data = get_latest_codeparams(code_coll,
+                                                          m['name'])
+            except:
+                continue
             current_elapsed_seconds = calc_elapsed_seconds(
                     current_heart_rate_data,
                     current_code_data,
